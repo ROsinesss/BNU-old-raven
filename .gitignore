@@ -1,0 +1,44 @@
+# ===== IDE / 编辑器 =====
+.history/
+.idea/
+.vscode/
+*.iml
+
+# ===== Flutter / Dart =====
+app/build/
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.metadata
+app/pubspec.lock
+
+# ===== Android =====
+app/android/local.properties
+app/android/.gradle/
+app/android/app/build/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# ===== iOS =====
+app/ios/Pods/
+app/ios/.symlinks/
+app/ios/Flutter/flutter_export_environment.sh
+app/ios/Flutter/Generated.xcconfig
+
+# ===== Python 后端 =====
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+*.pyo
+.env
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 构建产物 =====
+*.apk
+北师老鸦.apk
