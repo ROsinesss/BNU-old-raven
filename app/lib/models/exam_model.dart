@@ -1,26 +1,35 @@
 /// 考试安排模型
 class Exam {
   final String courseName;
+  final String credits;
+  final String category;
+  final String examType;
   final String examTime;
   final String examLocation;
   final String seatNumber;
-  final String examType;
+  final String examRound;
 
   Exam({
     this.courseName = '',
+    this.credits = '',
+    this.category = '',
+    this.examType = '',
     this.examTime = '',
     this.examLocation = '',
     this.seatNumber = '',
-    this.examType = '',
+    this.examRound = '',
   });
 
   factory Exam.fromJson(Map<String, dynamic> json) {
     return Exam(
       courseName: json['course_name'] ?? '',
+      credits: json['credits'] ?? '',
+      category: json['category'] ?? '',
+      examType: json['exam_type'] ?? '',
       examTime: json['exam_time'] ?? '',
       examLocation: json['exam_location'] ?? '',
       seatNumber: json['seat_number'] ?? '',
-      examType: json['exam_type'] ?? '',
+      examRound: json['exam_round'] ?? '',
     );
   }
 }

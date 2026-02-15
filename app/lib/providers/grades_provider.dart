@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import '../models/grade_model.dart';
 import '../models/exam_model.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
 
 /// 成绩与考试状态管理
 class GradesProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
+  final CacheService _cache = CacheService();
 
   GradesData? _gradesData;
   ExamsData? _examsData;
@@ -19,6 +21,10 @@ class GradesProvider extends ChangeNotifier {
   int _selectedYearEnd = 0;
   int _selectedSemester = -1;
 
+  // 考试学期筛选
+  int _examYear = 0;
+  int _examSemester = -1;
+
   GradesData? get gradesData => _gradesData;
   ExamsData? get examsData => _examsData;
   bool get loadingGrades => _loadingGrades;
@@ -28,6 +34,24 @@ class GradesProvider extends ChangeNotifier {
   int get selectedYear => _selectedYear;
   int get selectedYearEnd => _selectedYearEnd;
   int get selectedSemester => _selectedSemester;
+  int get examYear => _examYear;
+  int get examSemester => _examSemester;
+
+  /// 从本地缓存恢复数据
+  void loadFromCache() {
+    final gKey = CacheService.gradesKey(_selectedYear, _selectedYearEnd, _selectedSemester);
+    final gCached = _cache.get(gKey);
+    if (gCached != null) {
+      _gradesData = GradesData.fromJson(gCached);
+      debugPrint('[GradesProvider] 从缓存恢复 ${_gradesData?.grades.length} 条成绩');
+    }
+    final eKey = CacheService.examsKey(_examYear, _examSemester);
+    final eCached = _cache.get(eKey);
+    if (eCached != null) {
+      _examsData = ExamsData.fromJson(eCached);
+      debugPrint('[GradesProvider] 从缓存恢复 ${_examsData?.exams.length} 条考试');
+    }
+  }
 
   /// 加载成绩
   Future<void> fetchGrades({int? year, int? yearEnd, int? semester}) async {
@@ -51,6 +75,10 @@ class GradesProvider extends ChangeNotifier {
       _gradesData = GradesData.fromJson(data);
       debugPrint('[GradesProvider] parsed grades count: ${_gradesData?.grades.length}');
       _loadingGrades = false;
+
+      // 保存到本地缓存
+      _cache.put(CacheService.gradesKey(_selectedYear, _selectedYearEnd, _selectedSemester), data);
+
       notifyListeners();
     } catch (e, stack) {
       debugPrint('[GradesProvider] fetchGrades error: $e');
@@ -70,15 +98,25 @@ class GradesProvider extends ChangeNotifier {
   }
 
   /// 加载考试安排
-  Future<void> fetchExams() async {
+  Future<void> fetchExams({int? year, int? semester}) async {
+    if (year != null) _examYear = year;
+    if (semester != null) _examSemester = semester;
+
     _loadingExams = true;
     _examsError = null;
     notifyListeners();
 
     try {
-      final data = await _api.getExams();
+      final data = await _api.getExams(
+        year: _examYear,
+        semester: _examSemester,
+      );
       _examsData = ExamsData.fromJson(data);
       _loadingExams = false;
+
+      // 保存到本地缓存
+      _cache.put(CacheService.examsKey(_examYear, _examSemester), data);
+
       notifyListeners();
     } catch (e) {
       _examsError = '获取考试安排失败';

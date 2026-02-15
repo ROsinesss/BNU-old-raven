@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import auth, schedule, grades, exams
+from routers import auth, schedule, grades, exams, semester
 
 # 配置日志
 logging.basicConfig(
@@ -46,6 +46,7 @@ app.include_router(auth.router)
 app.include_router(schedule.router)
 app.include_router(grades.router)
 app.include_router(exams.router)
+app.include_router(semester.router)
 
 
 @app.get("/")

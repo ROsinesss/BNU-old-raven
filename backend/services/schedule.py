@@ -28,6 +28,19 @@ from models.schemas import Course, ScheduleSlot, ScheduleResponse
 
 logger = logging.getLogger(__name__)
 
+# ---- 缓存：key = (student_id, year, semester) ----
+_schedule_cache: dict[tuple[str, int, int], ScheduleResponse] = {}
+
+
+def clear_schedule_cache(student_id: str = ""):
+    """清除课表缓存，student_id 为空则清除全部"""
+    if not student_id:
+        _schedule_cache.clear()
+        return
+    keys_to_remove = [k for k in _schedule_cache if k[0] == student_id]
+    for k in keys_to_remove:
+        del _schedule_cache[k]
+
 # 星期映射
 DAY_MAP = {
     "一": 1, "二": 2, "三": 3, "四": 4,
@@ -132,17 +145,26 @@ def get_schedule_token(session: requests.Session) -> str:
     return ""
 
 
-def fetch_schedule(session: requests.Session, year: int = 2025,
-                   semester: int = 1, token: str = "") -> ScheduleResponse:
+def fetch_schedule(session: requests.Session, student_id: str = "",
+                   year: int = 2025, semester: int = 1,
+                   token: str = "") -> ScheduleResponse:
     """
-    获取课表数据
+    获取课表数据（带缓存）
     
     Args:
         session: 已登录的 requests.Session
+        student_id: 学号（用于缓存 key）
         year: 学年起始年份
         semester: 0=秋季, 1=春季
         token: 安全 token
     """
+    # 检查缓存
+    cache_key = (student_id, year, semester)
+    if student_id and cache_key in _schedule_cache:
+        cached = _schedule_cache[cache_key]
+        logger.info(f"课表数据命中缓存: {student_id} {year}/{semester}, "
+                    f"{len(cached.courses)} 门课")
+        return cached
     # 构造 params 参数（Base64 编码）
     params_raw = f"xn={year}&xq={semester}"
     params_b64 = base64.b64encode(params_raw.encode()).decode()
@@ -168,7 +190,15 @@ def fetch_schedule(session: requests.Session, year: int = 2025,
             logger.error(f"课表请求失败: HTTP {resp.status_code}")
             return ScheduleResponse()
         
-        return parse_schedule_html(resp.text)
+        result = parse_schedule_html(resp.text)
+
+        # 写入缓存（有课程时才缓存）
+        if student_id and result.courses:
+            _schedule_cache[cache_key] = result
+            logger.info(f"课表数据已缓存: {student_id} {year}/{semester}, "
+                        f"{len(result.courses)} 门课")
+
+        return result
     
     except Exception as e:
         logger.exception(f"获取课表失败: {e}")

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import '../services/api_service.dart';
@@ -87,6 +88,14 @@ class AuthProvider extends ChangeNotifier {
   }
 
   String _parseError(dynamic e) {
+    // 优先从 Dio 响应体中提取后端返回的 detail
+    if (e is DioException && e.response != null) {
+      final data = e.response!.data;
+      if (data is Map && data.containsKey('detail')) {
+        return data['detail'].toString();
+      }
+      if (e.response!.statusCode == 401) return '学号或密码错误';
+    }
     if (e is Exception) {
       final msg = e.toString();
       if (msg.contains('401')) return '学号或密码错误';

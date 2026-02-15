@@ -17,9 +17,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   void initState() {
     super.initState();
+    // HomeScreen 已负责并行预取，此处仅在缓存也为空时补发
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<ScheduleProvider>();
-      if (provider.scheduleData == null) {
+      if (provider.scheduleData == null && !provider.loading) {
         provider.fetchSchedule();
       }
     });
@@ -38,15 +39,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       children: [
         // 学期选择 + 周次选择
         _buildSemesterAndWeekBar(provider),
-        // 星期标题行
-        _buildDayHeader(),
-        // 课表网格
+        // 星期标题行（含日期）
+        _buildDayHeader(provider),
+        // 课表网格（自适应满屏）
         Expanded(
           child: provider.loading
               ? _buildShimmerLoading()
               : provider.error != null
                   ? _buildError(provider)
-                  : _buildGrid(provider),
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        return _buildGrid(provider, constraints.maxHeight);
+                      },
+                    ),
         ),
       ],
     );
@@ -305,9 +310,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  Widget _buildDayHeader() {
-    const days = ['一', '二', '三', '四', '五', '六', '日'];
-    final today = _todayDay;
+  Widget _buildDayHeader(ScheduleProvider provider) {
+    const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    final todayWeekday = DateTime.now().weekday; // 1=Mon ... 7=Sun
 
     return Container(
       padding: const EdgeInsets.only(bottom: 2),
@@ -321,11 +326,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         children: [
           const SizedBox(width: 28),
           ...List.generate(7, (i) {
-            final isToday = (i + 1) == today;
+            final isToday = (i + 1) == todayWeekday;
             return Expanded(
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
                   decoration: isToday
                       ? BoxDecoration(
                           color: AppTheme.primaryColor.withValues(alpha: 0.1),
@@ -335,9 +341,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   child: Text(
                     days[i],
                     style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                      color: isToday ? AppTheme.primaryColor : Colors.grey[500],
+                      fontSize: 12,
+                      fontWeight:
+                          isToday ? FontWeight.w800 : FontWeight.w600,
+                      color: isToday
+                          ? AppTheme.primaryColor
+                          : Colors.grey[500],
                     ),
                   ),
                 ),
@@ -400,83 +409,81 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  Widget _buildGrid(ScheduleProvider provider) {
+  Widget _buildGrid(ScheduleProvider provider, double availableHeight) {
     final slots = provider.currentWeekSlots;
     const totalSections = 12;
-    const sectionHeight = 58.0;
+    final sectionHeight = availableHeight / totalSections;
 
-    return SingleChildScrollView(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 左侧节次标签
-          SizedBox(
-            width: 28,
-            child: Column(
-              children: List.generate(totalSections, (i) {
-                return Container(
-                  height: sectionHeight,
-                  alignment: Alignment.center,
-                  child: Text(
-                    '${i + 1}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey[400],
-                      fontWeight: FontWeight.w500,
-                    ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 左侧节次标签
+        SizedBox(
+          width: 28,
+          child: Column(
+            children: List.generate(totalSections, (i) {
+              return Container(
+                height: sectionHeight,
+                alignment: Alignment.center,
+                child: Text(
+                  '${i + 1}',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey[400],
+                    fontWeight: FontWeight.w500,
                   ),
-                );
-              }),
-            ),
-          ),
-          // 7 天的列
-          ...List.generate(7, (dayIndex) {
-            final day = dayIndex + 1;
-            final isToday = day == _todayDay;
-            final daySlots = slots.where((s) => s.dayOfWeek == day).toList();
-            return Expanded(
-              child: Container(
-                height: totalSections * sectionHeight,
-                decoration: BoxDecoration(
-                  color: isToday
-                      ? AppTheme.primaryColor.withValues(alpha: 0.03)
-                      : null,
                 ),
-                child: Stack(
-                  children: [
-                    // 网格线
-                    ...List.generate(totalSections, (i) {
-                      return Positioned(
-                        top: i * sectionHeight,
-                        left: 0,
-                        right: 0,
-                        child: Container(
-                          height: sectionHeight,
-                          decoration: BoxDecoration(
-                            border: Border(
-                              top: BorderSide(
-                                  color: Colors.grey[100]!, width: 0.5),
-                              right: BorderSide(
-                                  color: Colors.grey[100]!, width: 0.5),
-                            ),
+              );
+            }),
+          ),
+        ),
+        // 7 天的列
+        ...List.generate(7, (dayIndex) {
+          final day = dayIndex + 1;
+          final isToday = day == _todayDay;
+          final daySlots = slots.where((s) => s.dayOfWeek == day).toList();
+          return Expanded(
+            child: Container(
+              height: totalSections * sectionHeight,
+              decoration: BoxDecoration(
+                color: isToday
+                    ? AppTheme.primaryColor.withValues(alpha: 0.03)
+                    : null,
+              ),
+              child: Stack(
+                children: [
+                  // 网格线
+                  ...List.generate(totalSections, (i) {
+                    return Positioned(
+                      top: i * sectionHeight,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: sectionHeight,
+                        decoration: BoxDecoration(
+                          border: Border(
+                            top: BorderSide(
+                                color: Colors.grey[100]!, width: 0.5),
+                            right: BorderSide(
+                                color: Colors.grey[100]!, width: 0.5),
                           ),
                         ),
-                      );
-                    }),
-                    // 课程卡片
-                    ...daySlots.map((slot) => _buildCourseCard(slot)),
-                  ],
-                ),
+                      ),
+                    );
+                  }),
+                  // 课程卡片
+                  ...daySlots.map(
+                      (slot) => _buildCourseCard(slot, sectionHeight)),
+                ],
               ),
-            );
-          }),
-        ],
-      ),
+            ),
+          );
+        }),
+      ],
     );
   }
 
-  Widget _buildCourseCard(ScheduleSlot slot) {
-    const sectionHeight = 58.0;
+  Widget _buildCourseCard(ScheduleSlot slot, double sectionHeight) {
     final top = (slot.startSection - 1) * sectionHeight;
     final height = (slot.endSection - slot.startSection + 1) * sectionHeight;
     final color = AppTheme.getCourseColor(slot.colorIndex);

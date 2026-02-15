@@ -85,8 +85,22 @@ class ApiService {
 
   // ============ 考试 ============
 
-  Future<Map<String, dynamic>> getExams() async {
-    final res = await _dio.get(ApiConfig.exams);
+  Future<Map<String, dynamic>> getExams({
+    int year = 0,
+    int semester = -1,
+  }) async {
+    final res = await _dio.get(ApiConfig.exams, queryParameters: {
+      'year': year,
+      'semester': semester,
+    });
+    return res.data;
+  }
+
+  // ============ 学期信息 ============
+
+  Future<Map<String, dynamic>> getSemesterInfo({int year = 0, int semester = -1}) async {
+    final res = await _dio.get(ApiConfig.semesterInfo,
+        queryParameters: {'year': year, 'semester': semester});
     return res.data;
   }
 }

@@ -17,10 +17,10 @@ router = APIRouter(prefix="/api/auth", tags=["认证"])
 @router.post("/login", response_model=LoginResponse)
 async def login(req: LoginRequest):
     """用户登录"""
-    auth_service = get_or_create_session(req.student_id, req.password)
+    auth_service, error_msg = get_or_create_session(req.student_id, req.password)
     
     if not auth_service:
-        raise HTTPException(status_code=401, detail="登录失败，请检查学号和密码")
+        raise HTTPException(status_code=401, detail=error_msg or "登录失败，请检查学号和密码")
     
     # 生成 JWT token
     expire = datetime.utcnow() + timedelta(minutes=JWT_EXPIRE_MINUTES)

@@ -22,6 +22,8 @@ async def get_grades(year: int = 0, year_end: int = 0, semester: int = -1,
     - semester: -1=全部, 0=秋季, 1=春季
     """
     session = session_info["session"]
+    student_id = session_info["student_id"]
     
-    result = fetch_grades(session, year=year, year_end=year_end, semester=semester)
+    result = fetch_grades(session, student_id=student_id,
+                          year=year, year_end=year_end, semester=semester)
     return result

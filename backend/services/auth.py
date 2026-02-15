@@ -275,38 +275,32 @@ class AuthService:
             logger.warning(f"教务系统 SSO 失败: {e}")
     
     def _fetch_user_info(self):
-        """登录成功后从课表数据页面获取用户信息"""
+        """登录成功后从课表数据页面获取用户信息（只查当前学期，速度优先）"""
         try:
             import base64
-            # 使用当前学年的课表数据页来获取学生姓名和班级
-            # 尝试几个可能的学年
             from datetime import datetime
             now = datetime.now()
             year = now.year if now.month >= 9 else now.year - 1
+            sem = 0 if now.month >= 9 or now.month <= 2 else 1
             
-            for y in [year, year - 1]:
-                for sem in [0, 1]:
-                    params_raw = f"xn={y}&xq={sem}"
-                    params_b64 = base64.b64encode(params_raw.encode()).decode()
-                    url = vpn_url(f"{SCHEDULE_DATA_PATH}?params={params_b64}")
-                    referer = vpn_url("frame/homes.html")
-                    resp = self.session.get(url, timeout=15, 
-                                           headers={"Referer": referer})
-                    resp.encoding = "gbk"
-                    
-                    if resp.status_code == 200 and len(resp.text) > 3000:
-                        # 匹配姓名
-                        m = re.search(r'姓名[：:]\s*([^\s<,，]+)', resp.text)
-                        if m:
-                            self.student_name = m.group(1)
-                        # 匹配班级
-                        m = re.search(r'所在班级[：:]\s*(.+?)(?:\s*</)', resp.text, re.DOTALL)
-                        if m:
-                            self.class_name = m.group(1)
-                        
-                        if self.student_name:
-                            logger.info(f"用户信息：{self.student_name}, {self.class_name}")
-                            return
+            params_raw = f"xn={year}&xq={sem}"
+            params_b64 = base64.b64encode(params_raw.encode()).decode()
+            url = vpn_url(f"{SCHEDULE_DATA_PATH}?params={params_b64}")
+            referer = vpn_url("frame/homes.html")
+            resp = self.session.get(url, timeout=10, 
+                                   headers={"Referer": referer})
+            resp.encoding = "gbk"
+            
+            if resp.status_code == 200 and len(resp.text) > 3000:
+                m = re.search(r'姓名[：:]\s*([^\s<,，]+)', resp.text)
+                if m:
+                    self.student_name = m.group(1)
+                m = re.search(r'所在班级[：:]\s*(.+?)(?:\s*</)', resp.text, re.DOTALL)
+                if m:
+                    self.class_name = m.group(1)
+                if self.student_name:
+                    logger.info(f"用户信息：{self.student_name}, {self.class_name}")
+                    return
             
             logger.warning("未能获取用户信息")
         except Exception as e:

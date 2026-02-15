@@ -30,6 +30,7 @@ app/ios/Flutter/Generated.xcconfig
 # ===== Python 后端 =====
 backend/__pycache__/
 backend/**/__pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 .env

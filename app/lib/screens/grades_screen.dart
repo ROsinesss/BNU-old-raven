@@ -15,9 +15,10 @@ class _GradesScreenState extends State<GradesScreen> {
   @override
   void initState() {
     super.initState();
+    // HomeScreen 已负责并行预取，此处仅在缓存也为空时补发
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<GradesProvider>();
-      if (provider.gradesData == null) {
+      if (provider.gradesData == null && !provider.loadingGrades) {
         provider.fetchGrades();
       }
     });

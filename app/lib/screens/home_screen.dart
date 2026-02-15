@@ -19,6 +19,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  bool _prefetched = false;
 
   final _screens = const [
     ScheduleScreen(),
@@ -27,6 +28,38 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   final _titles = const ['课表', '成绩', '考试'];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _prefetchAll();
+    });
+  }
+
+  /// 并行预取所有数据（课表、成绩、考试）
+  void _prefetchAll() {
+    if (_prefetched) return;
+    _prefetched = true;
+
+    final schedule = context.read<ScheduleProvider>();
+    final grades = context.read<GradesProvider>();
+
+    // 先从本地缓存恢复（瞬间完成）
+    grades.loadFromCache();
+
+    // 并行发起所有 API 请求
+    if (schedule.scheduleData == null ||
+        schedule.scheduleData!.courses.isEmpty) {
+      schedule.fetchSchedule();
+    }
+    if (grades.gradesData == null) {
+      grades.fetchGrades();
+    }
+    if (grades.examsData == null) {
+      grades.fetchExams();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

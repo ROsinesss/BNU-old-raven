@@ -97,10 +97,13 @@ class GradesResponse(BaseModel):
 class Exam(BaseModel):
     """考试安排"""
     course_name: str = ""
+    credits: str = ""
+    category: str = ""          # 类别
+    exam_type: str = ""          # 考核方式
     exam_time: str = ""
     exam_location: str = ""
     seat_number: str = ""
-    exam_type: str = ""
+    exam_round: str = ""         # 考试轮次名称
 
 
 class ExamsResponse(BaseModel):

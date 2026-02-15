@@ -11,6 +11,9 @@
 数据表格列：
   学年学期 | 课程/环节 | 学分 | 类别 | 课程性质 | 考核方式 | 修读性质
   | 平时成绩 | 期末成绩 | 综合成绩 | 辅修标记 | 备注
+
+注意：VPN 对请求有限频，每次成绩查询需 5 次请求（4 次 token + 1 次数据），
+因此需要做缓存——同一 session 同一查询参数只抓一次。
 """
 
 import re
@@ -30,6 +33,19 @@ from config import (
 from models.schemas import Grade, GradesResponse
 
 logger = logging.getLogger(__name__)
+
+# ---- 缓存：key = (student_id, year, year_end, semester) ----
+_grades_cache: dict[tuple[str, int, int, int], GradesResponse] = {}
+
+
+def clear_grades_cache(student_id: str = ""):
+    """清除成绩缓存，student_id 为空则清除全部"""
+    if not student_id:
+        _grades_cache.clear()
+        return
+    keys_to_remove = [k for k in _grades_cache if k[0] == student_id]
+    for k in keys_to_remove:
+        del _grades_cache[k]
 
 EDU_REFERER = {"Referer": vpn_url("frame/homes.html")}
 
@@ -86,19 +102,27 @@ def _get_grades_token(session: requests.Session) -> str:
         return ""
 
 
-def fetch_grades(session: requests.Session, year: int = 0,
-                 year_end: int = 0, semester: int = -1,
+def fetch_grades(session: requests.Session, student_id: str = "",
+                 year: int = 0, year_end: int = 0, semester: int = -1,
                  token: str = "") -> GradesResponse:
     """
-    获取成绩数据
+    获取成绩数据（带缓存）
 
     Args:
         session: 已登录的 requests.Session
+        student_id: 学号（用于缓存 key）
         year: 学年起始年份，0=全部（入学以来）
         year_end: 学年结束年份
         semester: -1=全部, 0=秋季, 1=春季
         token: token（可选，会自动获取）
     """
+    # 检查缓存
+    cache_key = (student_id, year, year_end, semester)
+    if student_id and cache_key in _grades_cache:
+        cached = _grades_cache[cache_key]
+        logger.info(f"成绩数据命中缓存: {student_id} year={year} sem={semester}, "
+                    f"{len(cached.grades)} 条")
+        return cached
     # 访问 homes.html 确保上下文
     try:
         session.get(vpn_url(HOME_PATH), timeout=15)
@@ -172,7 +196,15 @@ def fetch_grades(session: requests.Session, year: int = 0,
             logger.warning(f"成绩请求失败: HTTP {resp.status_code}")
             return GradesResponse()
 
-        return parse_grades_html(resp.text)
+        result = parse_grades_html(resp.text)
+
+        # 写入缓存（有数据时才缓存）
+        if student_id and result.grades:
+            _grades_cache[cache_key] = result
+            logger.info(f"成绩数据已缓存: {student_id} year={year} sem={semester}, "
+                        f"{len(result.grades)} 条")
+
+        return result
 
     except Exception as e:
         logger.exception(f"获取成绩失败: {e}")
